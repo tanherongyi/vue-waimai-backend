@@ -4,12 +4,45 @@ import pymongo, os
 from .computeDis import cal_dis
 from qiniu import Auth, put_file, BucketManager
 from bson import ObjectId
-import json, time
+import json, time, requests
 
 # 连接到mongodb
 client = pymongo.MongoClient('127.0.0.1:27017')
 # 连接到数据库
 db = client["waimai-db"]
+
+
+# 获取用户location和address
+@api.route('/getlocation')
+def getlocation():
+    ip = request.args.get('ip', '')
+    if ip == '':
+        return jsonify({'code': 0, 'error': '请求类型不正确'})
+    else:
+        result = {}
+        loc_url = 'http://apis.map.qq.com/ws/location/v1/ip'
+        add_url = 'http://apis.map.qq.com/ws/geocoder/v1/'
+        params_loc = {'key': current_app.config['TENCENT_MAP_KEY'], 'ip': ip}
+        loc_res = requests.get(loc_url, params=params_loc)
+        location = str(loc_res.json()['result']['location']['lat']) + ',' + str(loc_res.json()['result']['location']['lng'])
+        result['location'] = location
+        params_add = {'location': location, 'key': current_app.config['TENCENT_MAP_KEY']}
+        add_res = requests.get(add_url, params=params_add)
+        result['address'] = add_res.json()['result']['address']
+        return jsonify({'code': 1, 'data': result})
+
+
+# 获取定位地址列表建议
+@api.route('/getsug')
+def getsug():
+    keyword = request.args.get('kw', '')
+    if keyword == '':
+        return jsonify({'code': 0, 'error': '请求类型不正确'})
+    else:
+        sug_url = 'http://apis.map.qq.com/ws/place/v1/suggestion'
+        params = {'keyword': keyword, 'key': current_app.config['TENCENT_MAP_KEY']}
+        res = requests.get(sug_url, params=params)
+        return jsonify({'code': 1, 'data': res.json()})
 
 
 # 获取店铺（首页及分类页展示）
